@@ -48,6 +48,67 @@ flowchart TB
   Worker --> Redis
 ```
 
+## Схема взаимодействия микросервисов
+
+Логические сервисы и зоны ответственности — в [`01-services.md`](01-services.md). Ниже — как они связаны: **сплошные стрелки** — синхронные вызовы (HTTP/gRPC) от Bot Gateway к доменным сервисам и к хранилищам; **пунктир** — асинхронная публикация событий в брокер и обработка воркерами (пересчёт рейтингов, метрики, инвалидация кэша).
+
+```mermaid
+flowchart TB
+  subgraph ext [External]
+    TAPI[Telegram Bot API]
+    MINIO[(MinIO)]
+  end
+
+  subgraph gw [Edge]
+    BOT[Bot Gateway]
+  end
+
+  subgraph domain [Domain microservices]
+    IDENT[Identity]
+    PROF[Profile]
+    FEED[Feed Matching]
+    INTER[Interaction Events]
+  end
+
+  subgraph async [Async]
+    MQ[(Message Broker)]
+    WRK[Celery Workers]
+  end
+
+  subgraph data [Data]
+    PG[(PostgreSQL)]
+    RD[(Redis)]
+  end
+
+  TAPI <--> BOT
+  BOT --> IDENT
+  BOT --> PROF
+  BOT --> FEED
+  BOT --> INTER
+  PROF --> MINIO
+  IDENT --> PG
+  PROF --> PG
+  FEED --> PG
+  FEED --> RD
+  INTER --> PG
+  INTER -.-> MQ
+  MQ -.-> WRK
+  WRK --> PG
+  WRK --> RD
+```
+
+Кратко по потокам:
+
+| Направление | Что происходит |
+|-------------|----------------|
+| Bot Gateway → Identity | Регистрация/поиск пользователя по `telegram_id`, выдача внутреннего `user_id`. |
+| Bot Gateway → Profile | CRUD анкеты, метаданные фото; загрузка файлов в MinIO (presigned URL или прокси). |
+| Bot Gateway → Feed Matching | Следующая анкета, пачка ID в Redis, фильтры из `user_preferences`. |
+| Bot Gateway → Interaction | Лайк/скип/мэтч, запись в БД, **публикация события** в брокер. |
+| Broker → Celery | Обработка событий: поведенческий и комбинированный рейтинг, обновление `profile_ratings`, при необходимости правка кэша в Redis. |
+
+На защите можно показать тот же рисунок и сказать, что сервисы допускается собрать в **один деплой** (модули монолита), но границы и потоки данных остаются такими же.
+
 ## Схема БД (связи таблиц)
 
 Ниже — ER-диаграмма по [`schema.sql`](schema.sql): справочники, пользователь и анкета, лента/мэтчи/сообщения, рефералы. Составной ключ `profile_interests` связывает анкеты и теги интересов (M:N). Типы в Mermaid упрощены (`string`/`int`), чтобы диаграмма открывалась в GitHub; точные типы PostgreSQL — только в DDL.
