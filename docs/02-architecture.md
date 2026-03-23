@@ -50,110 +50,97 @@ flowchart TB
 
 ## Схема БД (связи таблиц)
 
-Ниже — ER-диаграмма по [`schema.sql`](schema.sql): справочники, пользователь и анкета, лента/мэтчи/сообщения, рефералы. Составной ключ `profile_interests` связывает анкеты и теги интересов (M:N).
+Ниже — ER-диаграмма по [`schema.sql`](schema.sql): справочники, пользователь и анкета, лента/мэтчи/сообщения, рефералы. Составной ключ `profile_interests` связывает анкеты и теги интересов (M:N). Типы в Mermaid упрощены (`string`/`int`), чтобы диаграмма открывалась в GitHub; точные типы PostgreSQL — только в DDL.
 
 ```mermaid
 erDiagram
   ref_genders {
-    varchar code PK
-    smallint sort_order
+    string code PK
+    int sort_order
   }
-
   ref_interaction_actions {
-    varchar code PK
+    string code PK
   }
-
   users {
-    bigint id PK
-    bigint telegram_id UK
-    varchar username
-    varchar first_name
-    varchar last_name
+    int id PK
+    int telegram_id
+    string username
+    string first_name
+    string last_name
   }
-
   user_preferences {
-    bigint user_id PK_FK
-    smallint age_min
-    smallint age_max
-    varchar gender_preference
-    varchar city_preference
+    int user_id PK
+    int age_min
+    int age_max
+    string gender_preference
+    string city_preference
   }
-
   profiles {
-    bigint id PK
-    bigint user_id FK_UK
-    varchar display_name
-    varchar gender_code FK
-    varchar city
-    smallint profile_completeness
+    int id PK
+    int user_id FK
+    string display_name
+    string gender_code FK
+    string city
+    int profile_completeness
   }
-
   interests {
-    smallint id PK
-    varchar slug UK
-    varchar title
+    int id PK
+    string slug
+    string title
   }
-
   profile_interests {
-    bigint profile_id PK_FK
-    smallint interest_id PK_FK
+    int profile_id FK
+    int interest_id FK
   }
-
   profile_photos {
-    bigint id PK
-    bigint profile_id FK
-    varchar storage_key
+    int id PK
+    int profile_id FK
+    string storage_key
   }
-
   profile_ratings {
-    bigint profile_id PK_FK
-    numeric primary_score
-    numeric behavioral_score
-    numeric combined_score
+    int profile_id PK
+    string primary_score
+    string behavioral_score
+    string combined_score
   }
-
   interactions {
-    bigint id PK
-    bigint viewer_id FK
-    bigint viewed_id FK
-    varchar action_code FK
+    int id PK
+    int viewer_id FK
+    int viewed_id FK
+    string action_code FK
   }
-
   matches {
-    bigint id PK
-    bigint user_low_id FK
-    bigint user_high_id FK
+    int id PK
+    int user_low_id FK
+    int user_high_id FK
   }
-
   messages {
-    bigint id PK
-    bigint match_id FK
-    bigint sender_id FK
-    varchar body
+    int id PK
+    int match_id FK
+    int sender_id FK
+    string body
   }
-
   referrals {
-    bigint id PK
-    bigint referrer_id FK
-    bigint referred_id FK_UK
+    int id PK
+    int referrer_id FK
+    int referred_id FK
   }
-
-  ref_genders ||--o{ profiles : "gender_code"
-  users ||--|| profiles : "1 анкета"
-  users ||--|| user_preferences : "фильтры ленты"
-  users ||--o{ interactions : "viewer"
-  users ||--o{ interactions : "viewed"
-  ref_interaction_actions ||--o{ interactions : "action_code"
-  users ||--o{ matches : "user_low_id"
-  users ||--o{ matches : "user_high_id"
-  matches ||--o{ messages : "чат"
-  users ||--o{ messages : "sender_id"
-  profiles ||--o{ profile_photos : "фото"
-  profiles ||--|| profile_ratings : "рейтинги"
-  profiles ||--o{ profile_interests : ""
-  interests ||--o{ profile_interests : ""
-  users ||--o{ referrals : "referrer_id"
-  users ||--o| referrals : "referred_id"
+  ref_genders ||--o{ profiles : gender_code
+  users ||--|| profiles : one_profile
+  users ||--|| user_preferences : filters
+  users ||--o{ interactions : viewer
+  users ||--o{ interactions : viewed
+  ref_interaction_actions ||--o{ interactions : action_code
+  users ||--o{ matches : user_low
+  users ||--o{ matches : user_high
+  matches ||--o{ messages : thread
+  users ||--o{ messages : sender
+  profiles ||--o{ profile_photos : photos
+  profiles ||--|| profile_ratings : scores
+  profiles ||--o{ profile_interests : m2m
+  interests ||--o{ profile_interests : m2m
+  users ||--o{ referrals : referrer
+  users ||--o| referrals : referred
 ```
 
 Кратко по кардинальности:
