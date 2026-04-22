@@ -1,8 +1,8 @@
-import Redis from "ioredis";
-import { randomBytes } from "node:crypto";
-import { config } from "../config";
-import type { BenchMessage } from "../types";
-import type { IBrokerAdapter } from "./broker";
+import Redis from 'ioredis';
+import { randomBytes } from 'node:crypto';
+import { config } from '../config';
+import type { BenchMessage } from '../types';
+import type { IBrokerAdapter } from './broker';
 
 function redisOptions() {
   return {
@@ -13,11 +13,11 @@ function redisOptions() {
 }
 
 function quietErrors(client: Redis): void {
-  client.on("error", () => undefined);
+  client.on('error', () => undefined);
 }
 
 export class RedisStreamsBroker implements IBrokerAdapter {
-  readonly kind = "redis" as const;
+  readonly kind = 'redis' as const;
 
   private client: Redis | null = null;
   private consumerClients: Redis[] = [];
@@ -29,23 +29,23 @@ export class RedisStreamsBroker implements IBrokerAdapter {
   }
 
   private async ensureGroup(): Promise<void> {
-    if (!this.client) throw new Error("Redis: not connected");
+    if (!this.client) throw new Error('Redis: not connected');
     try {
       await this.client.xgroup(
-        "CREATE",
+        'CREATE',
         config.redisStreamKey,
         config.redisConsumerGroup,
-        "0",
-        "MKSTREAM",
+        '0',
+        'MKSTREAM',
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (!msg.includes("BUSYGROUP")) throw e;
+      if (!msg.includes('BUSYGROUP')) throw e;
     }
   }
 
   async reset(): Promise<void> {
-    if (!this.client) throw new Error("Redis: not connected");
+    if (!this.client) throw new Error('Redis: not connected');
     await this.client.del(config.redisStreamKey);
     await this.ensureGroup();
   }
@@ -62,11 +62,11 @@ export class RedisStreamsBroker implements IBrokerAdapter {
   }
 
   async publish(message: BenchMessage): Promise<void> {
-    if (!this.client) throw new Error("Redis: not connected");
+    if (!this.client) throw new Error('Redis: not connected');
     await this.client.xadd(
       config.redisStreamKey,
-      "*",
-      "data",
+      '*',
+      'data',
       JSON.stringify(message),
     );
   }
@@ -76,9 +76,9 @@ export class RedisStreamsBroker implements IBrokerAdapter {
     onMessage: (latencyMs: number) => void,
     onConsumeError: () => void,
   ): Promise<() => Promise<void>> {
-    if (!this.client) throw new Error("Redis: not connected");
+    if (!this.client) throw new Error('Redis: not connected');
 
-    const suffix = randomBytes(4).toString("hex");
+    const suffix = randomBytes(4).toString('hex');
     const stopFlags = Array.from({ length: count }, () => ({ stop: false }));
     const tasks: Promise<void>[] = [];
 
@@ -93,16 +93,16 @@ export class RedisStreamsBroker implements IBrokerAdapter {
           while (!stopFlags[i]!.stop) {
             try {
               const res = (await sub.xreadgroup(
-                "GROUP",
+                'GROUP',
                 config.redisConsumerGroup,
                 consumerName,
-                "COUNT",
+                'COUNT',
                 50,
-                "BLOCK",
+                'BLOCK',
                 2000,
-                "STREAMS",
+                'STREAMS',
                 config.redisStreamKey,
-                ">",
+                '>',
               )) as Array<[string, Array<[string, string[]]>]> | null;
 
               if (!res) continue;
@@ -111,12 +111,16 @@ export class RedisStreamsBroker implements IBrokerAdapter {
                 for (const [id, fields] of entries) {
                   try {
                     const map = fieldsToMap(fields);
-                    const raw = map.get("data");
-                    if (!raw) throw new Error("missing data field");
+                    const raw = map.get('data');
+                    if (!raw) throw new Error('missing data field');
                     const body = JSON.parse(raw) as BenchMessage;
                     const latencyMs = Date.now() - body.sentAtMs;
                     onMessage(latencyMs);
-                    await sub.xack(config.redisStreamKey, config.redisConsumerGroup, id);
+                    await sub.xack(
+                      config.redisStreamKey,
+                      config.redisConsumerGroup,
+                      id,
+                    );
                   } catch {
                     onConsumeError();
                   }

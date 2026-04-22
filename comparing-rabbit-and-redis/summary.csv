@@ -1,0 +1,19 @@
+broker,scenario_id,label,payload_bytes,target_msg_per_sec,duration_sec,messages_sent,messages_consumed,lost,publish_errors,consume_errors,throughput_sent_per_sec,throughput_consumed_per_sec,latency_avg_ms,latency_p95_ms,latency_max_ms,degraded,degradation_reasons
+rabbitmq,rate-1000-payload-1kb,"1000 msg/s, 1kb",1024,1000,10,10003,10003,0,0,0,994.43,994.43,1.50,4.00,67.00,false,
+redis,rate-1000-payload-1kb,"1000 msg/s, 1kb",1024,1000,10,10002,10002,0,0,0,824.77,824.77,2.15,9.00,148.00,false,
+rabbitmq,rate-1000-payload-10kb,"1000 msg/s, 10kb",10240,1000,10,10004,10004,0,0,0,904.28,904.28,99.94,1067.00,1398.00,false,
+redis,rate-1000-payload-10kb,"1000 msg/s, 10kb",10240,1000,10,10002,10002,0,0,0,823.82,823.82,3.80,16.00,131.00,false,
+rabbitmq,rate-1000-payload-100kb,"1000 msg/s, 100kb",102400,1000,10,6530,6530,0,0,0,574.57,574.57,1859.07,2975.00,3228.00,false,
+redis,rate-1000-payload-100kb,"1000 msg/s, 100kb",102400,1000,10,8777,8778,0,0,0,66.36,66.37,71.83,9.00,119492.00,false,
+rabbitmq,rate-5000-payload-1kb,"5000 msg/s, 1kb",1024,5000,10,49993,49993,0,0,0,4946.37,4946.37,1.89,6.00,90.00,false,
+redis,rate-5000-payload-1kb,"5000 msg/s, 1kb",1024,5000,10,48135,48135,0,0,0,3955.22,3955.22,2.46,12.00,344.00,false,
+rabbitmq,rate-5000-payload-10kb,"5000 msg/s, 10kb",10240,5000,10,38733,38733,0,0,0,3136.28,3136.28,2044.11,4909.00,5067.00,false,
+redis,rate-5000-payload-10kb,"5000 msg/s, 10kb",10240,5000,10,35223,35223,0,0,0,2921.62,2921.62,5.61,16.00,204.00,false,
+rabbitmq,rate-5000-payload-100kb,"5000 msg/s, 100kb",102400,5000,10,5712,5712,0,0,0,476.28,476.28,2104.94,2973.00,3265.00,false,
+redis,rate-5000-payload-100kb,"5000 msg/s, 100kb",102400,5000,10,6167,6167,0,0,0,509.25,509.25,6.58,13.00,64.00,false,
+rabbitmq,rate-15000-payload-1kb,"15000 msg/s, 1kb",1024,15000,10,84778,84778,0,0,0,5350.80,5350.80,6701.06,10651.00,10742.00,true,backlog_growing;p95_latency
+redis,rate-15000-payload-1kb,"15000 msg/s, 1kb",1024,15000,10,89729,89729,0,0,0,7376.00,7376.00,9.79,22.00,368.00,false,
+rabbitmq,rate-15000-payload-10kb,"15000 msg/s, 10kb",10240,15000,10,51736,51736,0,0,0,3728.18,3728.18,5359.39,7504.00,7948.00,true,backlog_growing;p95_latency
+redis,rate-15000-payload-10kb,"15000 msg/s, 10kb",10240,15000,10,45388,45388,0,0,0,3718.50,3718.50,4.16,9.00,883.00,false,
+rabbitmq,rate-15000-payload-100kb,"15000 msg/s, 100kb",102400,15000,10,7252,7252,0,0,0,611.88,611.88,2773.80,4108.00,4446.00,false,
+redis,rate-15000-payload-100kb,"15000 msg/s, 100kb",102400,15000,10,6167,6167,0,0,0,503.22,503.22,6.61,13.00,141.00,false,

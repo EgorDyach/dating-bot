@@ -1,4 +1,4 @@
-import { runBenchmarkSuite } from "./benchmark-runner";
+import { runBenchmarkSuite } from './benchmark-runner';
 
 runBenchmarkSuite().catch((e) => {
   console.error(e);
