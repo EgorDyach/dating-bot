@@ -1,0 +1,31 @@
+{
+  "name": "comparing-rabbit-and-redis",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Benchmark stand: RabbitMQ vs Redis Streams (Node.js + TypeScript)",
+  "scripts": {
+    "build": "tsc",
+    "up": "docker compose up -d",
+    "down": "docker compose down",
+    "bench": "tsx src/run.ts",
+    "bench:full": "BENCH_FULL=1 tsx src/run.ts",
+    "bench:smoke": "BENCH_SMOKE=1 tsx src/run.ts",
+    "report": "tsx src/report.ts",
+    "producer": "tsx src/producer.ts",
+    "consumer": "tsx src/consumer.ts"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.4",
+    "dotenv": "^16.4.5",
+    "ioredis": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.5",
+    "@types/node": "^22.10.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
