@@ -1,3 +1,7 @@
+import { config as loadDotenv } from 'dotenv';
+
+loadDotenv();
+
 export type AppEnv = {
   botToken: string;
   databaseUrl: string;

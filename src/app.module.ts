@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { readEnv } from './config/env';
 import { InteractionEntity } from './database/entities/interaction.entity';
 import { ProfileEntity } from './database/entities/profile.entity';
+import { ProfilePhotoEntity } from './database/entities/profile-photo.entity';
 import { ProfileRatingEntity } from './database/entities/profile-rating.entity';
 import { UserPreferenceEntity } from './database/entities/user-preference.entity';
 import { UserEntity } from './database/entities/user.entity';
@@ -20,7 +21,14 @@ const env = readEnv();
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: env.databaseUrl,
-      entities: [UserEntity, ProfileEntity, UserPreferenceEntity, ProfileRatingEntity, InteractionEntity],
+      entities: [
+        UserEntity,
+        ProfileEntity,
+        UserPreferenceEntity,
+        ProfilePhotoEntity,
+        ProfileRatingEntity,
+        InteractionEntity,
+      ],
       synchronize: false,
       logging: false,
     }),

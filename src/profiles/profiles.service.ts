@@ -2,13 +2,18 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProfileEntity } from '../database/entities/profile.entity';
+import { ProfilePhotoEntity } from '../database/entities/profile-photo.entity';
 import { UpsertProfileDto } from './dto/upsert-profile.dto';
+
+type EditableProfileField = 'displayName' | 'bio' | 'city';
 
 @Injectable()
 export class ProfilesService {
   constructor(
     @InjectRepository(ProfileEntity)
     private readonly profileRepository: Repository<ProfileEntity>,
+    @InjectRepository(ProfilePhotoEntity)
+    private readonly profilePhotosRepository: Repository<ProfilePhotoEntity>,
   ) {}
 
   private static calcCompleteness(dto: UpsertProfileDto): number {
@@ -46,5 +51,67 @@ export class ProfilesService {
 
   async getByUserId(userId: string): Promise<ProfileEntity | null> {
     return this.profileRepository.findOne({ where: { userId } });
+  }
+
+  async getOrCreateByUserId(userId: string, defaultDisplayName: string): Promise<ProfileEntity> {
+    const existing = await this.getByUserId(userId);
+    if (existing) return existing;
+    return this.profileRepository.save(
+      this.profileRepository.create({
+        userId,
+        displayName: defaultDisplayName.trim().slice(0, 64) || 'Пользователь',
+        bio: '',
+        city: '',
+        profileCompleteness: 0,
+        isVisibleInFeed: true,
+      }),
+    );
+  }
+
+  async updateField(userId: string, field: EditableProfileField, value: string): Promise<ProfileEntity> {
+    const profile = await this.getOrCreateByUserId(userId, 'Пользователь');
+
+    if (field === 'displayName') {
+      profile.displayName = value.trim().slice(0, 64) || profile.displayName;
+    } else if (field === 'bio') {
+      profile.bio = value.trim().slice(0, 2000);
+    } else if (field === 'city') {
+      profile.city = value.trim().slice(0, 128);
+    }
+
+    profile.profileCompleteness = ProfilesService.calcCompleteness({
+      displayName: profile.displayName,
+      bio: profile.bio,
+      city: profile.city,
+      birthDate: profile.birthDate ?? undefined,
+      genderCode: (profile.genderCode ?? undefined) as 'male' | 'female' | undefined,
+    });
+
+    return this.profileRepository.save(profile);
+  }
+
+  async addPhotoByTelegramFileId(userId: string, telegramFileId: string): Promise<number> {
+    const profile = await this.getOrCreateByUserId(userId, 'Пользователь');
+    const photosCount = await this.profilePhotosRepository.count({
+      where: { profileId: profile.id },
+    });
+    await this.profilePhotosRepository.save(
+      this.profilePhotosRepository.create({
+        profileId: profile.id,
+        storageBucket: 'telegram',
+        storageKey: `telegram/${userId}/${telegramFileId}`,
+        contentType: 'image/jpeg',
+        sortOrder: photosCount,
+      }),
+    );
+    return photosCount + 1;
+  }
+
+  async countPhotos(userId: string): Promise<number> {
+    const profile = await this.getByUserId(userId);
+    if (!profile) return 0;
+    return this.profilePhotosRepository.count({
+      where: { profileId: profile.id },
+    });
   }
 }

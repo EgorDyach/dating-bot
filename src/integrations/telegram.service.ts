@@ -1,16 +1,19 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Telegraf } from 'telegraf';
+import { Markup, Telegraf } from 'telegraf';
 import { readEnv } from '../config/env';
 import { FeedService } from '../feed/feed.service';
 import { InteractionAction, InteractionsService } from '../interactions/interactions.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import { UsersService } from '../users/users.service';
 
+type ProfileEditField = 'displayName' | 'bio' | 'city';
+
 @Injectable()
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramService.name);
   private readonly bot = new Telegraf(readEnv().botToken);
-  private readonly lastShownByUser = new Map<string, string>();
+  private readonly pendingProfileEditField = new Map<string, ProfileEditField>();
+  private readonly waitingPhotoUpload = new Set<string>();
 
   constructor(
     private readonly usersService: UsersService,
@@ -20,6 +23,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit() {
+    await this.bot.telegram.setMyCommands([]);
+
     this.bot.start(async (ctx) => {
       const actor = ctx.from;
       if (!actor) return;
@@ -34,83 +39,197 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       if (isNew) {
         await ctx.reply(
           `Привет, ${name}.\n\nРегистрация завершена (id ${user.id}).\n` +
-            'Этап 3 активирован: доступны команды /profile, /feed, /like, /skip.',
+            'Открывай приложение кнопками ниже.',
+          this.mainInlineMenu(),
         );
       } else {
-        await ctx.reply(`С возвращением, ${name}. Твои данные обновлены (id ${user.id}).`);
+        await ctx.reply(`С возвращением, ${name}.`, this.mainInlineMenu());
       }
     });
 
-    this.bot.command('help', async (ctx) => {
-      await ctx.reply(
-        'Команды:\n' +
-          '/start - регистрация\n' +
-          '/profile Имя|Город|О себе - upsert анкеты\n' +
-          '/feed - показать следующую анкету\n' +
-          '/like - лайк последней анкеты\n' +
-          '/skip - пропуск последней анкеты',
-      );
-    });
-
-    this.bot.command('profile', async (ctx) => {
+    this.bot.action('menu:profile', async (ctx) => {
       const actor = ctx.from;
       if (!actor) return;
-      const user = await this.usersService.registerOrUpdateTelegramUser({
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
         telegramId: actor.id,
         username: actor.username,
         firstName: actor.first_name,
         lastName: actor.last_name,
         languageCode: actor.language_code,
       });
-
-      const raw = ctx.message.text.replace('/profile', '').trim();
-      const [displayName, city, bio] = raw.split('|').map((x) => x?.trim() ?? '');
-      if (!displayName) {
-        await ctx.reply('Формат: /profile Имя|Город|О себе');
-        return;
-      }
-      const profile = await this.profilesService.upsertOwnProfile(user.user.id, {
-        displayName,
-        city,
-        bio,
-      });
-      await ctx.reply(
-        `Анкета сохранена:\n` +
-          `Имя: ${profile.displayName}\n` +
-          `Город: ${profile.city || '-'}\n` +
-          `Completeness: ${profile.profileCompleteness}%`,
+      await ctx.answerCbQuery();
+      await this.sendOwnProfileCard(
+        {
+          userId: user.id,
+          displayNameFallback: actor.first_name || actor.username || 'Пользователь',
+        },
+        ctx.reply.bind(ctx),
       );
     });
 
-    this.bot.command('feed', async (ctx) => {
+    this.bot.action('menu:help', async (ctx) => {
+      await ctx.answerCbQuery();
+      await this.sendHelp(ctx.reply.bind(ctx));
+    });
+
+    this.bot.action('menu:feed', async (ctx) => {
       const actor = ctx.from;
       if (!actor) return;
-      const user = await this.usersService.registerOrUpdateTelegramUser({
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
         telegramId: actor.id,
         username: actor.username,
         firstName: actor.first_name,
         lastName: actor.last_name,
         languageCode: actor.language_code,
       });
-      const candidate = await this.feedService.getNextProfile(user.user.id);
-      if (!candidate) {
-        await ctx.reply('Пока нет подходящих анкет. Заполни профиль и попробуй позже.');
-        return;
-      }
+      await ctx.answerCbQuery();
+      await this.sendNextRealProfile(user.id, ctx.chat?.id, ctx.reply.bind(ctx));
+    });
 
-      this.lastShownByUser.set(user.user.id, candidate.userId);
+    this.bot.action(/^feed:(like|skip):(.+)$/, async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+      });
+      const action = ctx.match[1] as InteractionAction;
+      const viewedId = String(ctx.match[2]);
+
+      await this.interactionsService.react(user.id, viewedId, action);
+      await ctx.answerCbQuery(action === 'like' ? 'Лайк' : 'Дизлайк');
+      await this.sendNextRealProfile(user.id, ctx.chat?.id, ctx.reply.bind(ctx));
+    });
+
+    this.bot.action('menu:home', async (ctx) => {
+      await ctx.answerCbQuery();
+      await ctx.reply('Главное меню:', this.mainInlineMenu());
+    });
+
+    this.bot.action('profile:attach_photo', async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({ telegramId: actor.id });
+      this.waitingPhotoUpload.add(user.id);
+      this.pendingProfileEditField.delete(user.id);
+      await ctx.answerCbQuery();
+      await ctx.reply('Пришли фото одним сообщением. Я прикреплю его к анкете.', this.mainInlineMenu());
+    });
+
+    this.bot.action('profile:edit', async (ctx) => {
+      await ctx.answerCbQuery();
       await ctx.reply(
-        `Кандидат:\n` +
-          `Имя: ${candidate.displayName}\n` +
-          `Город: ${candidate.city || '-'}\n` +
-          `О себе: ${candidate.bio || '-'}\n` +
-          `Рейтинг: ${candidate.combinedScore.toFixed(2)}\n\n` +
-          'Ответь /like или /skip',
+        'Что изменить?',
+        Markup.inlineKeyboard([
+          [
+            Markup.button.callback('✏️ Имя', 'profile:edit:displayName'),
+            Markup.button.callback('📝 О себе', 'profile:edit:bio'),
+          ],
+          [
+            Markup.button.callback('🏙️ Город', 'profile:edit:city'),
+            Markup.button.callback('⬅️ Назад', 'profile:back'),
+          ],
+        ]),
       );
     });
 
-    this.bot.command('like', async (ctx) => this.handleReaction(ctx.from?.id, 'like', ctx.reply.bind(ctx)));
-    this.bot.command('skip', async (ctx) => this.handleReaction(ctx.from?.id, 'skip', ctx.reply.bind(ctx)));
+    this.bot.action(/^profile:edit:(displayName|bio|city)$/, async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({ telegramId: actor.id });
+      const field = ctx.match[1] as ProfileEditField;
+      this.pendingProfileEditField.set(user.id, field);
+      this.waitingPhotoUpload.delete(user.id);
+      await ctx.answerCbQuery();
+      const prompt =
+        field === 'displayName'
+          ? 'Пришли новое имя для анкеты.'
+          : field === 'bio'
+            ? 'Пришли новый текст "О себе".'
+            : 'Пришли новый город.';
+      await ctx.reply(prompt, this.mainInlineMenu());
+    });
+
+    this.bot.action('profile:back', async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+        firstName: actor.first_name,
+        username: actor.username,
+      });
+      this.pendingProfileEditField.delete(user.id);
+      this.waitingPhotoUpload.delete(user.id);
+      await ctx.answerCbQuery();
+      await this.sendOwnProfileCard(
+        {
+          userId: user.id,
+          displayNameFallback: actor.first_name || actor.username || 'Пользователь',
+        },
+        ctx.reply.bind(ctx),
+      );
+    });
+
+    this.bot.on('photo', async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({ telegramId: actor.id });
+      if (!this.waitingPhotoUpload.has(user.id)) {
+        await ctx.reply('Открой профиль и нажми "Прикрепить фото".', this.mainInlineMenu());
+        return;
+      }
+
+      const photos = (ctx.message as { photo?: Array<{ file_id: string }> }).photo ?? [];
+      const largest = photos[photos.length - 1];
+      if (!largest?.file_id) {
+        await ctx.reply('Не удалось прочитать фото, попробуй еще раз.', this.mainInlineMenu());
+        return;
+      }
+      const photoCount = await this.profilesService.addPhotoByTelegramFileId(user.id, largest.file_id);
+      this.waitingPhotoUpload.delete(user.id);
+      await ctx.reply(`Фото добавлено к анкете. Всего фото: ${photoCount}.`, this.mainInlineMenu());
+      await this.sendOwnProfileCard(
+        {
+          userId: user.id,
+          displayNameFallback: actor.first_name || actor.username || 'Пользователь',
+        },
+        ctx.reply.bind(ctx),
+      );
+    });
+
+    this.bot.on('text', async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const text = ctx.message.text?.trim();
+      if (!text || text.startsWith('/')) {
+        await ctx.reply('Используй кнопки в сообщениях бота.', this.mainInlineMenu());
+        return;
+      }
+
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({ telegramId: actor.id });
+      const pendingField = this.pendingProfileEditField.get(user.id);
+      if (!pendingField) {
+        await ctx.reply('Навигация только кнопками. Открой меню ниже.', this.mainInlineMenu());
+        return;
+      }
+
+      await this.profilesService.updateField(user.id, pendingField, text);
+      this.pendingProfileEditField.delete(user.id);
+      await ctx.reply('Изменение сохранено.', this.mainInlineMenu());
+      await this.sendOwnProfileCard(
+        {
+          userId: user.id,
+          displayNameFallback: actor.first_name || actor.username || 'Пользователь',
+        },
+        ctx.reply.bind(ctx),
+      );
+    });
+
+    this.bot.on('message', async (ctx) => {
+      if ('text' in ctx.message || 'photo' in ctx.message) {
+        return;
+      }
+      await ctx.reply('Используй кнопки в меню.', this.mainInlineMenu());
+    });
 
     await this.bot.launch();
     this.logger.log('telegram polling started');
@@ -120,21 +239,87 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     await this.bot.stop();
   }
 
-  private async handleReaction(
-    telegramId: number | undefined,
-    action: InteractionAction,
-    reply: (message: string) => Promise<unknown>,
+  private mainInlineMenu() {
+    return Markup.inlineKeyboard([
+      [Markup.button.callback('👤 Мой профиль', 'menu:profile')],
+      [Markup.button.callback('🧩 Анкеты', 'menu:feed')],
+      [Markup.button.callback('❓ Помощь', 'menu:help')],
+    ]);
+  }
+
+  private async sendHelp(reply: (message: string, extra?: unknown) => Promise<unknown>) {
+    await reply(
+      [
+        'Помощь:',
+        '• Все управление только через inline-кнопки',
+        '• 👤 Мой профиль - карточка профиля, фото и редактирование',
+        '• 🧩 Анкеты - показать следующую анкету',
+      ].join('\n'),
+      Markup.inlineKeyboard([[Markup.button.callback('⬅️ В меню', 'menu:home')]]),
+    );
+  }
+
+  private async sendNextRealProfile(
+    viewerId: string,
+    chatId: number | undefined,
+    reply: (message: string, extra?: unknown) => Promise<unknown>,
   ): Promise<void> {
-    if (!telegramId) return;
-    const { user } = await this.usersService.registerOrUpdateTelegramUser({ telegramId });
-    const targetId = this.lastShownByUser.get(user.id);
-    if (!targetId) {
-      await reply('Сначала вызови /feed, чтобы получить анкету.');
+    const candidate = await this.feedService.getNextProfile(viewerId);
+    if (!candidate) {
+      await reply(
+        'Пока нет подходящих анкет в базе. Добавь реальные анкеты и попробуй снова.',
+        Markup.inlineKeyboard([[Markup.button.callback('⬅️ В меню', 'menu:home')]]),
+      );
       return;
     }
 
-    await this.interactionsService.react(user.id, targetId, action);
-    this.lastShownByUser.delete(user.id);
-    await reply(action === 'like' ? 'Лайк сохранен и отправлен в очередь.' : 'Пропуск сохранен.');
+    const caption = [
+      'Кандидат:',
+      `Имя: ${candidate.displayName}`,
+      `Город: ${candidate.city || '-'}`,
+      `О себе: ${candidate.bio || '-'}`,
+      `Рейтинг: ${candidate.combinedScore.toFixed(2)}`,
+    ].join('\n');
+
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback('❤️ Лайк', `feed:like:${candidate.userId}`),
+        Markup.button.callback('👎 Дизлайк', `feed:skip:${candidate.userId}`),
+      ],
+      [Markup.button.callback('⬅️ В меню', 'menu:home')],
+    ]);
+
+    if (candidate.photoFileId && chatId) {
+      await this.bot.telegram.sendPhoto(chatId, candidate.photoFileId, {
+        caption,
+        reply_markup: keyboard.reply_markup,
+      });
+      return;
+    }
+
+    await reply(caption, keyboard);
+  }
+
+  private async sendOwnProfileCard(
+    input: { userId: string; displayNameFallback: string },
+    reply: (message: string, extra?: unknown) => Promise<unknown>,
+  ): Promise<void> {
+    const profile = await this.profilesService.getOrCreateByUserId(input.userId, input.displayNameFallback);
+    const photoCount = await this.profilesService.countPhotos(input.userId);
+    await reply(
+      [
+        'Твоя анкета:',
+        `Имя: ${profile.displayName || '-'}`,
+        `О себе: ${profile.bio || '-'}`,
+        `Город: ${profile.city || '-'}`,
+        `Фото: ${photoCount}`,
+        `Заполненность: ${profile.profileCompleteness}%`,
+      ].join('\n'),
+      Markup.inlineKeyboard([
+        [Markup.button.callback('📷 Прикрепить фото', 'profile:attach_photo')],
+        [Markup.button.callback('✏️ Изменить', 'profile:edit')],
+        [Markup.button.callback('⬅️ В меню', 'menu:home')],
+      ]),
+    );
   }
 }
