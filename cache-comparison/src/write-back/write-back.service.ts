@@ -9,7 +9,7 @@ import { MetricsService } from '../metrics/metrics.service';
 export class WriteBackService implements OnModuleInit, OnModuleDestroy {
   private cache: Redis;
   private writeQueue: Map<number, Partial<Product>> = new Map();
-  private flushInterval: NodeJS.Timer;
+  private flushInterval: NodeJS.Timeout;
   private flushing = false;
 
   constructor(
