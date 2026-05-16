@@ -5,7 +5,7 @@
   "main": "dist/src/main.js",
   "scripts": {
     "start": "node dist/src/main.js",
-    "start:dev": "tsx watch src/main.ts",
+    "start:dev": "ts-node --transpile-only src/main.ts",
     "build": "tsc",
     "seed": "tsx scripts/seed.ts"
   },
@@ -24,7 +24,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.17.12",
-    "typescript": "^5.7.3",
-    "tsx": "^4.7.0"
+    "ts-node": "^10.9.2",
+    "tsx": "^4.7.0",
+    "typescript": "^5.7.3"
   }
 }

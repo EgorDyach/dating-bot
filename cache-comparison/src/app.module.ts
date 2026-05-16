@@ -5,7 +5,7 @@ import { AppController } from './app.controller';
 import { LazyModule } from './lazy/lazy.module';
 import { WriteThroughModule } from './write-through/write-through.module';
 import { WriteBackModule } from './write-back/write-back.module';
-import { MetricsService } from './metrics/metrics.service';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
@@ -20,11 +20,11 @@ import { MetricsService } from './metrics/metrics.service';
       synchronize: false,
       logging: false,
     }),
+    MetricsModule,
     LazyModule,
     WriteThroughModule,
     WriteBackModule,
   ],
   controllers: [AppController],
-  providers: [MetricsService],
 })
 export class AppModule {}

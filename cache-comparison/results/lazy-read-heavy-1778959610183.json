@@ -1,0 +1,33 @@
+{
+  "testConfig": {
+    "strategy": "lazy",
+    "mode": "read-heavy",
+    "duration": 30,
+    "concurrency": 10
+  },
+  "result": {
+    "strategy": "lazy",
+    "mode": "read-heavy",
+    "duration": 30,
+    "concurrency": 10,
+    "totalRequests": 200257,
+    "successfulRequests": 200257,
+    "failedRequests": 0,
+    "throughput": 6675.01,
+    "avgLatency": 1.5,
+    "minLatency": 0,
+    "maxLatency": 113,
+    "p95Latency": 3,
+    "p99Latency": 5,
+    "timestamp": "2026-05-16T19:26:50.164Z"
+  },
+  "appMetrics": {
+    "strategy": "lazy",
+    "cache_hits": 127085,
+    "cache_misses": 32890,
+    "hit_rate": "79.44%",
+    "db_reads": 32890,
+    "db_writes": 40282,
+    "total_db_calls": 73172
+  }
+}

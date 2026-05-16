@@ -4,5 +4,4 @@ dist/
 .env.local
 *.log
 .DS_Store
-results/*.json
 load-generator/node_modules/

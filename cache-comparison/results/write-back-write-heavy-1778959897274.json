@@ -1,0 +1,33 @@
+{
+  "testConfig": {
+    "strategy": "write-back",
+    "mode": "write-heavy",
+    "duration": 30,
+    "concurrency": 10
+  },
+  "result": {
+    "strategy": "write-back",
+    "mode": "write-heavy",
+    "duration": 30,
+    "concurrency": 10,
+    "totalRequests": 129053,
+    "successfulRequests": 129053,
+    "failedRequests": 0,
+    "throughput": 4301.77,
+    "avgLatency": 2.32,
+    "minLatency": 0,
+    "maxLatency": 81,
+    "p95Latency": 4,
+    "p99Latency": 8,
+    "timestamp": "2026-05-16T19:31:37.253Z"
+  },
+  "appMetrics": {
+    "strategy": "write-back",
+    "cache_hits": 25569,
+    "cache_misses": 0,
+    "hit_rate": "100.00%",
+    "db_reads": 0,
+    "db_writes": 5696,
+    "total_db_calls": 5696
+  }
+}
