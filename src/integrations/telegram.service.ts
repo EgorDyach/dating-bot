@@ -54,11 +54,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      const { HttpProxyAgent } = require('http-proxy-agent');
-      const { HttpsProxyAgent } = require('https-proxy-agent');
-
-      const proxyUrl = `http://${env.proxyServer}:${env.proxyPort}`;
-      const agent = new HttpsProxyAgent(proxyUrl);
+      const { SocksProxyAgent } = require('socks-proxy-agent');
+      const agent = new SocksProxyAgent(`socks5://${env.proxyServer}:${env.proxyPort}`);
 
       return {
         telegram: {
