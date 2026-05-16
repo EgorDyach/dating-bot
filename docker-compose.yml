@@ -34,9 +34,8 @@ services:
     ports:
       - '8888:8888'
     environment:
-      PROXY_SERVER: ${PROXY_SERVER}
-      PROXY_PORT: ${PROXY_PORT}
-      PROXY_SECRET: ${PROXY_SECRET}
+      LISTEN_HOST: 0.0.0.0
+      LISTEN_PORT: 8888
 
   bot:
     build: .
