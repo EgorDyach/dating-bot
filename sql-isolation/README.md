@@ -115,6 +115,8 @@ WHERE id = 1 AND version = @expected_version;
 -- нужно повторить попытку с новой версией
 ```
 
+![Lost Update](./1.png)
+
 ---
 
 ## Аномалия 2: Dirty Read (Грязное чтение)
@@ -207,6 +209,8 @@ WHERE product_id = 1 AND status = 'PUBLISHED'
 ORDER BY id DESC LIMIT 1;
 ```
 
+![Dirty Read](./2.png)
+
 ---
 
 ## Аномалия 3: Non-repeatable Read (Непостоянное чтение)
@@ -287,6 +291,8 @@ SELECT * FROM bank_accounts FOR SHARE;  -- блокируем
 -- Никто не может менять эти строки пока мы читаем
 COMMIT;
 ```
+
+![Non-repeatable Read](./3.png)
 
 ---
 
@@ -471,23 +477,5 @@ CREATE TABLE order_events (
 4. В первом окне выполняйте СЕССИЯ 1 пошагово
 5. Во втором окне выполняйте СЕССИЯ 2 пошагово, чередуясь
 6. Смотрите на результат SELECT — вот и аномалия!
-
----
-
-## Скрины демонстрации
-
-### 1. Lost Update
-
-![Lost Update](./1.png)
-
-### 2. Dirty Read
-
-![Dirty Read](./2.png)
-
-### 3. Non-repeatable Read
-
-![Non-repeatable Read](./3.png)
-
-### 4. Phantom Read
 
 ![Phantom Read](./4.png)
