@@ -5,6 +5,7 @@ import { ProfileEntity } from '../database/entities/profile.entity';
 import { ProfilePhotoEntity } from '../database/entities/profile-photo.entity';
 import { ProfileRatingEntity } from '../database/entities/profile-rating.entity';
 import { UserPreferenceEntity } from '../database/entities/user-preference.entity';
+import { BlockEntity } from '../database/entities/block.entity';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { FeedService } from './feed.service';
 
@@ -16,6 +17,7 @@ import { FeedService } from './feed.service';
       ProfileRatingEntity,
       UserPreferenceEntity,
       InteractionEntity,
+      BlockEntity,
     ]),
     IntegrationsModule,
   ],

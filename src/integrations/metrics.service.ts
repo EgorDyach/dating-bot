@@ -10,6 +10,8 @@ export class MetricsService {
   private readonly profileRatingGauge: Gauge;
   private readonly feedBatchDurationHistogram: Histogram;
   private readonly ratingRecalculationDurationHistogram: Histogram;
+  private readonly blockCounter: Counter;
+  private readonly reportCounter: Counter;
 
   constructor() {
     this.profilesViewedCounter = new Counter({
@@ -50,6 +52,17 @@ export class MetricsService {
       help: 'Duration of rating recalculation in milliseconds',
       buckets: [10, 50, 100, 500, 1000, 5000],
     });
+
+    this.blockCounter = new Counter({
+      name: 'blocks_total',
+      help: 'Total number of user blocks',
+    });
+
+    this.reportCounter = new Counter({
+      name: 'reports_total',
+      help: 'Total number of user reports',
+      labelNames: ['reason'],
+    });
   }
 
   recordProfileView(action: string): void {
@@ -78,6 +91,14 @@ export class MetricsService {
 
   recordRatingRecalculationDuration(durationMs: number): void {
     this.ratingRecalculationDurationHistogram.observe(durationMs);
+  }
+
+  recordBlock(): void {
+    this.blockCounter.inc();
+  }
+
+  recordReport(reason: string): void {
+    this.reportCounter.labels(reason).inc();
   }
 
   async getMetrics(): Promise<string> {

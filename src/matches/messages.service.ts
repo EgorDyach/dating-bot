@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MessageEntity } from '../database/entities/message.entity';
 import { MatchEntity } from '../database/entities/match.entity';
+import { BlocksService } from '../blocks/blocks.service';
 
 export type Message = {
   id: string;
@@ -19,6 +20,7 @@ export class MessagesService {
     private readonly messageRepository: Repository<MessageEntity>,
     @InjectRepository(MatchEntity)
     private readonly matchRepository: Repository<MatchEntity>,
+    private readonly blocksService: BlocksService,
   ) {}
 
   async sendMessage(matchId: string, senderId: string, body: string): Promise<Message> {
@@ -27,6 +29,13 @@ export class MessagesService {
 
     const isParticipant = String(match.userLowId) === senderId || String(match.userHighId) === senderId;
     if (!isParticipant) throw new Error('User is not a participant in this match');
+
+    // Get the other participant
+    const otherParticipantId = String(match.userLowId) === senderId ? String(match.userHighId) : String(match.userLowId);
+
+    // Check if either participant has blocked the other
+    const isBlocked = await this.blocksService.isBlocked(senderId, otherParticipantId);
+    if (isBlocked) throw new Error('Cannot send message - one user has blocked the other');
 
     const message = this.messageRepository.create({
       matchId: matchId as any,

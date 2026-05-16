@@ -5,7 +5,7 @@ import { ProfileEntity } from '../database/entities/profile.entity';
 import { ProfilePhotoEntity } from '../database/entities/profile-photo.entity';
 import { UpsertProfileDto } from './dto/upsert-profile.dto';
 
-type EditableProfileField = 'displayName' | 'bio' | 'city';
+type EditableProfileField = 'displayName' | 'bio' | 'city' | 'birthDate' | 'genderCode';
 
 @Injectable()
 export class ProfilesService {
@@ -77,6 +77,24 @@ export class ProfilesService {
       profile.bio = value.trim().slice(0, 2000);
     } else if (field === 'city') {
       profile.city = value.trim().slice(0, 128);
+    } else if (field === 'birthDate') {
+      // Validate ISO date format YYYY-MM-DD
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(value.trim())) {
+        throw new Error('Invalid date format. Use YYYY-MM-DD');
+      }
+      const date = new Date(value.trim());
+      if (isNaN(date.getTime())) {
+        throw new Error('Invalid date');
+      }
+      // Store as YYYY-MM-DD string (PostgreSQL date type)
+      profile.birthDate = value.trim();
+    } else if (field === 'genderCode') {
+      const gender = value.trim().toLowerCase();
+      if (!['male', 'female'].includes(gender)) {
+        throw new Error("Gender must be 'male' or 'female'");
+      }
+      profile.genderCode = gender as 'male' | 'female';
     }
 
     profile.profileCompleteness = ProfilesService.calcCompleteness({

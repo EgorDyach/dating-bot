@@ -5,9 +5,21 @@ import { TelegramService } from '../integrations/telegram.service';
 import { InteractionsModule } from '../interactions/interactions.module';
 import { ProfilesModule } from '../profiles/profiles.module';
 import { UsersModule } from '../users/users.module';
+import { BlocksModule } from '../blocks/blocks.module';
+import { ReportsModule } from '../reports/reports.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
 
 @Module({
-  imports: [UsersModule, ProfilesModule, FeedModule, InteractionsModule, IntegrationsModule],
+  imports: [
+    UsersModule,
+    ProfilesModule,
+    FeedModule,
+    InteractionsModule,
+    IntegrationsModule,
+    BlocksModule,
+    ReportsModule,
+    AnalyticsModule,
+  ],
   providers: [TelegramService],
 })
 export class TelegramModule {}

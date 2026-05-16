@@ -11,6 +11,8 @@ import { ProfilePhotoEntity } from './database/entities/profile-photo.entity';
 import { ProfileRatingEntity } from './database/entities/profile-rating.entity';
 import { UserPreferenceEntity } from './database/entities/user-preference.entity';
 import { UserEntity } from './database/entities/user.entity';
+import { BlockEntity } from './database/entities/block.entity';
+import { ReportEntity } from './database/entities/report.entity';
 import { FeedModule } from './feed/feed.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { InteractionsModule } from './interactions/interactions.module';
@@ -18,6 +20,9 @@ import { MatchesModule } from './matches/matches.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { UsersModule } from './users/users.module';
+import { BlocksModule } from './blocks/blocks.module';
+import { ReportsModule } from './reports/reports.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 const env = readEnv();
 
@@ -35,6 +40,8 @@ const env = readEnv();
         InteractionEntity,
         MatchEntity,
         MessageEntity,
+        BlockEntity,
+        ReportEntity,
       ],
       synchronize: false,
       logging: false,
@@ -49,6 +56,9 @@ const env = readEnv();
     FeedModule,
     InteractionsModule,
     MatchesModule,
+    BlocksModule,
+    ReportsModule,
+    AnalyticsModule,
     TelegramModule,
   ],
 })

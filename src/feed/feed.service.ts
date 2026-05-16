@@ -6,6 +6,7 @@ import { ProfileEntity } from '../database/entities/profile.entity';
 import { ProfilePhotoEntity } from '../database/entities/profile-photo.entity';
 import { ProfileRatingEntity } from '../database/entities/profile-rating.entity';
 import { UserPreferenceEntity } from '../database/entities/user-preference.entity';
+import { BlockEntity } from '../database/entities/block.entity';
 import { RedisService } from '../integrations/redis.service';
 import { MetricsService } from '../integrations/metrics.service';
 
@@ -25,6 +26,8 @@ export class FeedService {
     private readonly profileRepository: Repository<ProfileEntity>,
     @InjectRepository(UserPreferenceEntity)
     private readonly prefRepository: Repository<UserPreferenceEntity>,
+    @InjectRepository(BlockEntity)
+    private readonly blockRepository: Repository<BlockEntity>,
     private readonly redisService: RedisService,
     private readonly metricsService: MetricsService,
   ) {}
@@ -91,11 +94,18 @@ export class FeedService {
         'i.viewer_id = :viewerId AND i.viewed_id = p.user_id',
         { viewerId },
       )
+      .leftJoin(
+        BlockEntity,
+        'b',
+        '(b.blocker_id = :viewerId AND b.blocked_id = p.user_id) OR (b.blocker_id = p.user_id AND b.blocked_id = :viewerId)',
+        { viewerId },
+      )
       .select('p.user_id', 'userId')
       .where('p.user_id <> :viewerId', { viewerId })
       .andWhere('p.is_active = true')
       .andWhere('p.is_visible_in_feed = true')
       .andWhere('i.id IS NULL')
+      .andWhere('b.id IS NULL')
       .orderBy('COALESCE(r.combined_score, 0)', 'DESC')
       .addOrderBy('p.profile_completeness', 'DESC')
       .addOrderBy('p.created_at', 'DESC')
@@ -106,6 +116,16 @@ export class FeedService {
     }
     if (pref?.genderPreference && pref.genderPreference !== 'any') {
       qb.andWhere('p.gender_code = :gender', { gender: pref.genderPreference });
+    }
+    if (pref?.ageMin != null || pref?.ageMax != null) {
+      // Only apply NOT NULL constraint when at least one age filter is active
+      qb.andWhere('p.birth_date IS NOT NULL');
+      if (pref?.ageMin != null) {
+        qb.andWhere("DATE_PART('year', AGE(p.birth_date)) >= :ageMin", { ageMin: pref.ageMin });
+      }
+      if (pref?.ageMax != null) {
+        qb.andWhere("DATE_PART('year', AGE(p.birth_date)) <= :ageMax", { ageMax: pref.ageMax });
+      }
     }
 
     const rows = await qb.getRawMany<{ userId: string }>();

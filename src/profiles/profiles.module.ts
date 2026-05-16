@@ -10,6 +10,7 @@ import { ProfilesService } from './profiles.service';
 import { RatingCalculationService } from './rating-calculation.service';
 import { RatingProcessor } from './rating.processor';
 import { RatingQueueService } from './rating-queue.service';
+import { IntegrationsModule } from '../integrations/integrations.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { RatingQueueService } from './rating-queue.service';
     BullModule.registerQueue({
       name: 'rating-recalculation',
     }),
+    IntegrationsModule,
   ],
   providers: [ProfilesService, RatingCalculationService, RatingProcessor, RatingQueueService],
   exports: [ProfilesService, RatingCalculationService, RatingQueueService],

@@ -13,8 +13,13 @@ import {
 } from '../interactions/interactions.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import { UsersService } from '../users/users.service';
+import { UserPreferencesService } from '../users/user-preferences.service';
+import { BlocksService } from '../blocks/blocks.service';
+import { ReportsService } from '../reports/reports.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 
-type ProfileEditField = 'displayName' | 'bio' | 'city';
+type ProfileEditField = 'displayName' | 'bio' | 'city' | 'birthDate' | 'genderCode';
+type PrefEditField = 'genderPreference' | 'cityPreference' | 'ageMin' | 'ageMax';
 
 @Injectable()
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
@@ -24,13 +29,19 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     string,
     ProfileEditField
   >();
+  private readonly pendingPrefEditField = new Map<string, PrefEditField>();
+  private readonly pendingReport = new Map<string, string>();
   private readonly waitingPhotoUpload = new Set<string>();
 
   constructor(
     private readonly usersService: UsersService,
+    private readonly userPreferencesService: UserPreferencesService,
     private readonly profilesService: ProfilesService,
     private readonly feedService: FeedService,
     private readonly interactionsService: InteractionsService,
+    private readonly blocksService: BlocksService,
+    private readonly reportsService: ReportsService,
+    private readonly analyticsService: AnalyticsService,
   ) {}
 
   async onModuleInit() {
@@ -85,6 +96,37 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       await this.sendHelp(ctx.reply.bind(ctx));
     });
 
+    this.bot.action('menu:preferences', async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      await ctx.answerCbQuery();
+      await this.sendPreferencesMenu(ctx.reply.bind(ctx));
+    });
+
+    this.bot.action('menu:stats', async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+      });
+      await ctx.answerCbQuery();
+      const stats = await this.analyticsService.getUserStats(user.id);
+      const message =
+        '📊 Твоя статистика:\n' +
+        `👁️ Просмотров профиля: ${stats.profileViewsCount}\n` +
+        `❤️ Лайков получено: ${stats.likesReceived}\n` +
+        `💑 Совпадений: ${stats.matchesCount}\n` +
+        `⭐ Рейтинг: ${stats.currentRating.toFixed(2)}\n` +
+        `👍 Ты лайкнул: ${stats.likesGiven}\n` +
+        `👎 Ты пропустил: ${stats.skipsGiven}`;
+      await ctx.reply(
+        message,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('⬅️ В меню', 'menu:home')],
+        ]),
+      );
+    });
+
     this.bot.action('menu:feed', async (ctx) => {
       const actor = ctx.from;
       if (!actor) return;
@@ -121,6 +163,79 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       );
     });
 
+    this.bot.action(/^user:block:(.+)$/, async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+      });
+      const blockedId = String(ctx.match[1]);
+      await this.blocksService.blockUser(user.id, blockedId);
+      await ctx.answerCbQuery('Пользователь заблокирован');
+      await this.sendNextRealProfile(
+        user.id,
+        ctx.chat?.id,
+        ctx.reply.bind(ctx),
+      );
+    });
+
+    this.bot.action(/^user:report:(.+)$/, async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+      });
+      const reportedId = String(ctx.match[1]);
+      this.pendingReport.set(user.id, reportedId);
+      await ctx.answerCbQuery();
+      await ctx.reply(
+        'Выбери причину жалобы:',
+        Markup.inlineKeyboard([
+          [
+            Markup.button.callback('🚨 Спам', 'report:reason:spam'),
+            Markup.button.callback('🔞 Неприличный контент', 'report:reason:inappropriate'),
+          ],
+          [
+            Markup.button.callback('🎭 Фейк', 'report:reason:fake'),
+            Markup.button.callback('❌ Отмена', 'report:cancel'),
+          ],
+        ]),
+      );
+    });
+
+    this.bot.action(/^report:reason:(spam|inappropriate|fake)$/, async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+      });
+      const reason = ctx.match[1];
+      const reportedId = this.pendingReport.get(user.id);
+      if (!reportedId) {
+        await ctx.answerCbQuery('Ошибка');
+        return;
+      }
+      await this.reportsService.reportUser(user.id, reportedId, reason);
+      this.pendingReport.delete(user.id);
+      await ctx.answerCbQuery('Жалоба отправлена');
+      await this.sendNextRealProfile(
+        user.id,
+        ctx.chat?.id,
+        ctx.reply.bind(ctx),
+      );
+    });
+
+    this.bot.action('report:cancel', async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+      });
+      this.pendingReport.delete(user.id);
+      await ctx.answerCbQuery();
+      await ctx.reply('Главное меню:', this.mainInlineMenu());
+    });
+
     this.bot.action('menu:home', async (ctx) => {
       await ctx.answerCbQuery();
       await ctx.reply('Главное меню:', this.mainInlineMenu());
@@ -137,7 +252,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       await ctx.answerCbQuery();
       await ctx.reply(
         'Пришли фото одним сообщением. Я прикреплю его к анкете.',
-        this.mainInlineMenu(),
+        Markup.inlineKeyboard([[Markup.button.callback('🚫 Отмена', 'profile:back')]]),
       );
     });
 
@@ -152,13 +267,17 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           ],
           [
             Markup.button.callback('🏙️ Город', 'profile:edit:city'),
+            Markup.button.callback('🎂 Дата рождения', 'profile:edit:birthDate'),
+          ],
+          [
+            Markup.button.callback('⚧ Пол', 'profile:edit:genderCode'),
             Markup.button.callback('⬅️ Назад', 'profile:back'),
           ],
         ]),
       );
     });
 
-    this.bot.action(/^profile:edit:(displayName|bio|city)$/, async (ctx) => {
+    this.bot.action(/^profile:edit:(displayName|bio|city|birthDate|genderCode)$/, async (ctx) => {
       const actor = ctx.from;
       if (!actor) return;
       const { user } = await this.usersService.registerOrUpdateTelegramUser({
@@ -167,14 +286,58 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       const field = ctx.match[1] as ProfileEditField;
       this.pendingProfileEditField.set(user.id, field);
       this.waitingPhotoUpload.delete(user.id);
+      this.pendingPrefEditField.delete(user.id);
       await ctx.answerCbQuery();
       const prompt =
         field === 'displayName'
           ? 'Пришли новое имя для анкеты.'
           : field === 'bio'
             ? 'Пришли новый текст "О себе".'
-            : 'Пришли новый город.';
-      await ctx.reply(prompt, this.mainInlineMenu());
+            : field === 'city'
+              ? 'Пришли новый город.'
+              : field === 'birthDate'
+                ? 'Пришли дату рождения в формате ГГГГ-ММ-ДД.'
+                : 'Пришли пол: male или female.';
+      await ctx.reply(
+        prompt,
+        Markup.inlineKeyboard([[Markup.button.callback('🚫 Отмена', 'profile:back')]]),
+      );
+    });
+
+    this.bot.action(/^prefs:edit:(genderPreference|cityPreference|ageMin|ageMax)$/, async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+      });
+      const field = ctx.match[1] as PrefEditField;
+      this.pendingPrefEditField.set(user.id, field);
+      this.pendingProfileEditField.delete(user.id);
+      this.waitingPhotoUpload.delete(user.id);
+      await ctx.answerCbQuery();
+      const prompt =
+        field === 'genderPreference'
+          ? 'Укажи предпочтение: any, male или female.'
+          : field === 'cityPreference'
+            ? 'Укажи город.'
+            : field === 'ageMin'
+              ? 'Укажи минимальный возраст (18+).'
+              : 'Укажи максимальный возраст.';
+      await ctx.reply(
+        prompt,
+        Markup.inlineKeyboard([[Markup.button.callback('🚫 Отмена', 'prefs:cancel')]]),
+      );
+    });
+
+    this.bot.action('prefs:cancel', async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+      });
+      this.pendingPrefEditField.delete(user.id);
+      await ctx.answerCbQuery();
+      await this.sendPreferencesMenu(ctx.reply.bind(ctx));
     });
 
     this.bot.action('profile:back', async (ctx) => {
@@ -256,6 +419,23 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       const { user } = await this.usersService.registerOrUpdateTelegramUser({
         telegramId: actor.id,
       });
+
+      // Check preference field first
+      const pendingPref = this.pendingPrefEditField.get(user.id);
+      if (pendingPref) {
+        try {
+          await this.userPreferencesService.updatePreference(user.id, pendingPref, text);
+          this.pendingPrefEditField.delete(user.id);
+          await ctx.reply('Фильтр сохранен.');
+          await this.sendPreferencesMenu(ctx.reply.bind(ctx));
+          return;
+        } catch (err) {
+          await ctx.reply(`Ошибка: ${err.message}`);
+          return;
+        }
+      }
+
+      // Check profile field
       const pendingField = this.pendingProfileEditField.get(user.id);
       if (!pendingField) {
         await ctx.reply(
@@ -265,17 +445,21 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      await this.profilesService.updateField(user.id, pendingField, text);
-      this.pendingProfileEditField.delete(user.id);
-      await ctx.reply('Изменение сохранено.', this.mainInlineMenu());
-      await this.sendOwnProfileCard(
-        {
-          userId: user.id,
-          displayNameFallback:
-            actor.first_name || actor.username || 'Пользователь',
-        },
-        ctx.reply.bind(ctx),
-      );
+      try {
+        await this.profilesService.updateField(user.id, pendingField, text);
+        this.pendingProfileEditField.delete(user.id);
+        await ctx.reply('Изменение сохранено.', this.mainInlineMenu());
+        await this.sendOwnProfileCard(
+          {
+            userId: user.id,
+            displayNameFallback:
+              actor.first_name || actor.username || 'Пользователь',
+          },
+          ctx.reply.bind(ctx),
+        );
+      } catch (err) {
+        await ctx.reply(`Ошибка: ${err.message}`);
+      }
     });
 
     this.bot.on('message', async (ctx) => {
@@ -297,6 +481,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     return Markup.inlineKeyboard([
       [Markup.button.callback('👤 Мой профиль', 'menu:profile')],
       [Markup.button.callback('🧩 Анкеты', 'menu:feed')],
+      [Markup.button.callback('🔍 Фильтры', 'menu:preferences')],
+      [Markup.button.callback('📊 Статистика', 'menu:stats')],
       [Markup.button.callback('❓ Помощь', 'menu:help')],
     ]);
   }
@@ -310,8 +496,27 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         '• Все управление только через inline-кнопки',
         '• 👤 Мой профиль - карточка профиля, фото и редактирование',
         '• 🧩 Анкеты - показать следующую анкету',
+        '• 🔍 Фильтры - настройка фильтров для ленты',
+        '• 📊 Статистика - твоя активность',
       ].join('\n'),
       Markup.inlineKeyboard([
+        [Markup.button.callback('⬅️ В меню', 'menu:home')],
+      ]),
+    );
+  }
+
+  private async sendPreferencesMenu(
+    reply: (message: string, extra?: unknown) => Promise<unknown>,
+  ) {
+    await reply(
+      'Фильтры профилей:',
+      Markup.inlineKeyboard([
+        [Markup.button.callback('⚧ Пол', 'prefs:edit:genderPreference')],
+        [Markup.button.callback('🏙️ Город', 'prefs:edit:cityPreference')],
+        [
+          Markup.button.callback('📅 Мин. возраст', 'prefs:edit:ageMin'),
+          Markup.button.callback('📅 Макс. возраст', 'prefs:edit:ageMax'),
+        ],
         [Markup.button.callback('⬅️ В меню', 'menu:home')],
       ]),
     );
@@ -346,6 +551,10 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         Markup.button.callback('❤️ Лайк', `feed:like:${candidate.userId}`),
         Markup.button.callback('👎 Дизлайк', `feed:skip:${candidate.userId}`),
       ],
+      [
+        Markup.button.callback('🚫 Блок', `user:block:${candidate.userId}`),
+        Markup.button.callback('⚠️ Жалоба', `user:report:${candidate.userId}`),
+      ],
       [Markup.button.callback('⬅️ В меню', 'menu:home')],
     ]);
 
@@ -375,6 +584,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         `Имя: ${profile.displayName || '-'}`,
         `О себе: ${profile.bio || '-'}`,
         `Город: ${profile.city || '-'}`,
+        `Дата рождения: ${profile.birthDate ? new Date(profile.birthDate).toLocaleDateString('ru-RU') : '-'}`,
+        `Пол: ${profile.genderCode || '-'}`,
         `Фото: ${photoCount}`,
         `Заполненность: ${profile.profileCompleteness}%`,
       ].join('\n'),
