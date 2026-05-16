@@ -2,10 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir aiohttp
-
-COPY mtproto_proxy.py ./mtproto_proxy.py
+COPY http_proxy.py ./http_proxy.py
 
 EXPOSE 8888
 
-CMD ["python", "-u", "mtproto_proxy.py"]
+CMD ["python", "-u", "http_proxy.py"]
