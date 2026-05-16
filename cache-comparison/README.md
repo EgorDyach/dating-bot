@@ -136,21 +136,21 @@ curl http://localhost:3000/metrics?strategy=lazy
 ### Выводы
 
 **Lazy Loading (Cache-Aside)**
-- ✅ Лучший throughput при чтении (highest speed)
-- ❌ Низкий hit rate при смешанной и write-heavy нагрузке
-- ❌ Много обращений в БД
+- Лучший throughput при чтении (highest speed)
+- Низкий hit rate при смешанной и write-heavy нагрузке
+- Много обращений в БД
 
 **Write-Through**
-- ✅ Высокий hit rate (99-100%)
-- ✅ Гарантированная консистентность
-- ❌ Медленнее при write-heavy нагрузке
-- ❌ Много обращений в БД при write-heavy
+- Высокий hit rate (99-100%)
+- Гарантированная консистентность
+- Медленнее при write-heavy нагрузке
+- Много обращений в БД при write-heavy
 
 **Write-Back**
-- ✅ **Минимум обращений в БД** (оптимизирует нагрузку)
-- ✅ **Лучший throughput при write-heavy** (4301 req/s)
-- ✅ 100% hit rate для balanced и write-heavy
-- ❌ Риск потери данных при сбое
+- Минимум обращений в БД (оптимизирует нагрузку)
+- Лучший throughput при write-heavy** (4301 req/s)
+- 100% hit rate для balanced и write-heavy
+- Риск потери данных при сбое
 
 ### Рекомендации
 
