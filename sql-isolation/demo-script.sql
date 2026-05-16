@@ -77,19 +77,25 @@ INSERT INTO products (id, name, price, sale_price) VALUES
 -- PostgreSQL по умолчанию READ COMMITTED, поэтому DIRTY READ не происходит
 -- Для демонстрации нужно использовать MySQL с READ UNCOMMITTED
 
--- MySQL СЕССИЯ 1 (ОКНО 1 - Администратор):
--- SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+-- PostgreSQL СЕССИЯ 1 (ОКНО 1 - Администратор):
 -- Шаг 1.1:
-START TRANSACTION;
+BEGIN;
 UPDATE products SET sale_price = 50000.00 WHERE id = 1;
 -- Шаг 1.2: (ПАУЗА - ждем, пока Алексей прочитает)
 -- Шаг 1.3:
 ROLLBACK; -- Администратор передумал!
 
--- MySQL СЕССИЯ 2 (ОКНО 2 - Покупатель Алексей):
--- SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+-- Создание таблицы для заказов (нужна для dirty read примера):
+DROP TABLE IF EXISTS orders CASCADE;
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER,
+    paid_price DECIMAL(10, 2)
+);
+
+-- PostgreSQL СЕССИЯ 2 (ОКНО 2 - Покупатель Алексей):
 -- Шаг 2.1:
-START TRANSACTION;
+BEGIN;
 SELECT sale_price FROM products WHERE id = 1; -- ГРЯЗНОЕ ЧТЕНИЕ: 50000 (не закоммичено!)
 INSERT INTO orders (product_id, paid_price) VALUES (1, 50000.00);
 -- Шаг 2.2:
