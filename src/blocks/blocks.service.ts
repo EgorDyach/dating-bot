@@ -18,7 +18,7 @@ export class BlocksService {
     // Upsert: idempotent
     await this.blockRepo.upsert(
       { blockerId, blockedId },
-      { conflictPaths: ['blocker_id', 'blocked_id'] },
+      { conflictPaths: ['blockerId', 'blockedId'] },
     );
 
     // Clear feed cache for both users

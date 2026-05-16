@@ -5,6 +5,7 @@ import { InteractionEntity } from '../database/entities/interaction.entity';
 import { ProfileEntity } from '../database/entities/profile.entity';
 import { ProfilePhotoEntity } from '../database/entities/profile-photo.entity';
 import { ProfileRatingEntity } from '../database/entities/profile-rating.entity';
+import { ReportEntity } from '../database/entities/report.entity';
 import { UserEntity } from '../database/entities/user.entity';
 import { ProfilesService } from './profiles.service';
 import { RatingCalculationService } from './rating-calculation.service';
@@ -19,6 +20,7 @@ import { IntegrationsModule } from '../integrations/integrations.module';
       ProfilePhotoEntity,
       ProfileRatingEntity,
       InteractionEntity,
+      ReportEntity,
       UserEntity,
     ]),
     BullModule.registerQueue({

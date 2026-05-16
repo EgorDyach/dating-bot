@@ -181,3 +181,29 @@ CREATE TABLE referrals (
 );
 
 CREATE INDEX idx_referrals_referrer ON referrals (referrer_id);
+
+CREATE TABLE blocks (
+    id              BIGSERIAL PRIMARY KEY,
+    blocker_id      BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    blocked_id      BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_blocks_distinct_users CHECK (blocker_id <> blocked_id),
+    CONSTRAINT uq_blocks_pair UNIQUE (blocker_id, blocked_id)
+);
+
+CREATE INDEX idx_blocks_blocker ON blocks (blocker_id);
+CREATE INDEX idx_blocks_blocked ON blocks (blocked_id);
+
+CREATE TABLE reports (
+    id              BIGSERIAL PRIMARY KEY,
+    reporter_id     BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    reported_id     BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    reason_code     VARCHAR(32) NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_reports_distinct_users CHECK (reporter_id <> reported_id),
+    CONSTRAINT ck_reports_reason CHECK (reason_code IN ('spam', 'inappropriate', 'fake'))
+);
+
+CREATE INDEX idx_reports_reporter ON reports (reporter_id);
+CREATE INDEX idx_reports_reported ON reports (reported_id);
+CREATE INDEX idx_reports_created ON reports (created_at DESC);

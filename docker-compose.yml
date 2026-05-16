@@ -10,15 +10,54 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docs/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+
   redis:
     image: redis:7-alpine
     ports:
       - '6379:6379'
+
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     ports:
       - '5672:5672'
       - '15672:15672'
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  mtproto-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.mtproto
+    ports:
+      - '8888:8888'
+    environment:
+      PROXY_SERVER: ${PROXY_SERVER}
+      PROXY_PORT: ${PROXY_PORT}
+      PROXY_SECRET: ${PROXY_SECRET}
+
+  bot:
+    build: .
+    restart: unless-stopped
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      DATABASE_URL: postgresql://dating:dating@postgres:5432/dating
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE}
+      PROXY_SERVER: mtproto-proxy
+      PROXY_PORT: 8888
+    depends_on:
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      mtproto-proxy:
+        condition: service_started
 
 volumes:
   postgres_data:

@@ -44,7 +44,7 @@ export class UserPreferencesService {
       case 'genderPreference':
         if (!['any', 'male', 'female'].includes(String(value))) {
           throw new Error(
-            "Invalid gender preference. Must be 'any', 'male', or 'female'",
+            "Неверное предпочтение по полу. Должно быть 'any', 'male' или 'female'",
           );
         }
         pref.genderPreference = String(value) as
@@ -56,7 +56,7 @@ export class UserPreferencesService {
       case 'cityPreference':
         const city = String(value).trim();
         if (city.length > 128) {
-          throw new Error('City name too long (max 128 chars)');
+          throw new Error('Название города слишком длинное (макс. 128 символов)');
         }
         pref.cityPreference = city;
         break;
@@ -65,16 +65,16 @@ export class UserPreferencesService {
       case 'ageMax':
         const age = parseInt(String(value), 10);
         if (isNaN(age) || age < 18) {
-          throw new Error('Age must be a number >= 18');
+          throw new Error('Возраст должен быть числом >= 18');
         }
         if (field === 'ageMin') {
           if (pref.ageMax && age > pref.ageMax) {
-            throw new Error('Min age cannot be greater than max age');
+            throw new Error('Минимальный возраст не может быть больше максимального');
           }
           pref.ageMin = age;
         } else {
           if (pref.ageMin && age < pref.ageMin) {
-            throw new Error('Max age cannot be less than min age');
+            throw new Error('Максимальный возраст не может быть меньше минимального');
           }
           pref.ageMax = age;
         }

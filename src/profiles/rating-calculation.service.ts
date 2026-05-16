@@ -5,6 +5,7 @@ import { InteractionEntity } from '../database/entities/interaction.entity';
 import { ProfileEntity } from '../database/entities/profile.entity';
 import { ProfilePhotoEntity } from '../database/entities/profile-photo.entity';
 import { ProfileRatingEntity } from '../database/entities/profile-rating.entity';
+import { ReportEntity } from '../database/entities/report.entity';
 import { UserEntity } from '../database/entities/user.entity';
 import { MetricsService } from '../integrations/metrics.service';
 
@@ -25,6 +26,8 @@ export class RatingCalculationService {
     private readonly ratingRepository: Repository<ProfileRatingEntity>,
     @InjectRepository(ProfilePhotoEntity)
     private readonly photoRepository: Repository<ProfilePhotoEntity>,
+    @InjectRepository(ReportEntity)
+    private readonly reportRepository: Repository<ReportEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
     private readonly metricsService: MetricsService,
@@ -33,7 +36,7 @@ export class RatingCalculationService {
   async recalculateRatingForProfile(profileId: string): Promise<RatingResult> {
     const startTime = Date.now();
     const profile = await this.profileRepository.findOne({ where: { id: profileId as any } });
-    if (!profile) throw new Error(`Profile ${profileId} not found`);
+    if (!profile) throw new Error(`Профиль ${profileId} не найден`);
 
     const primary = await this.calculatePrimaryScore(profile);
     const behavioral = await this.calculateBehavioralScore(profile.userId);
@@ -102,12 +105,20 @@ export class RatingCalculationService {
     const likeRatio = total > 0 ? likes / total : 0;
     const mutualLikes = await this.countMutualLikes(userId);
 
-    return (
+    let score =
       likes * 0.5 +
       superLikes * 1.5 +
       likeRatio * 20 +
-      Math.min(mutualLikes * 2, 30)
-    );
+      Math.min(mutualLikes * 2, 30);
+
+    // Apply penalty for reports
+    const reportCount = await this.reportRepository.count({
+      where: { reportedId: userId as any },
+    });
+    const reportPenalty = Math.min(reportCount * 3, 40);
+    score = Math.max(0, score - reportPenalty);
+
+    return score;
   }
 
   private calculateCombinedScore(primaryScore: number, behavioralScore: number): number {

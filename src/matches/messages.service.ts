@@ -25,17 +25,17 @@ export class MessagesService {
 
   async sendMessage(matchId: string, senderId: string, body: string): Promise<Message> {
     const match = await this.matchRepository.findOne({ where: { id: matchId as any } });
-    if (!match) throw new Error(`Match ${matchId} not found`);
+    if (!match) throw new Error(`Совпадение ${matchId} не найдено`);
 
     const isParticipant = String(match.userLowId) === senderId || String(match.userHighId) === senderId;
-    if (!isParticipant) throw new Error('User is not a participant in this match');
+    if (!isParticipant) throw new Error('Ты не участник этого совпадения');
 
     // Get the other participant
     const otherParticipantId = String(match.userLowId) === senderId ? String(match.userHighId) : String(match.userLowId);
 
     // Check if either participant has blocked the other
     const isBlocked = await this.blocksService.isBlocked(senderId, otherParticipantId);
-    if (isBlocked) throw new Error('Cannot send message - one user has blocked the other');
+    if (isBlocked) throw new Error('Невозможно отправить сообщение - один из пользователей заблокировал другого');
 
     const message = this.messageRepository.create({
       matchId: matchId as any,

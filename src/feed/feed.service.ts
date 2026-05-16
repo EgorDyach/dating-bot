@@ -77,6 +77,11 @@ export class FeedService {
 
   private extractTelegramFileId(storageKey: string | null): string | null {
     if (!storageKey) return null;
+    // If it's a full URL, return as-is (Telegram accepts http/https URLs)
+    if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) {
+      return storageKey;
+    }
+    // Otherwise extract the last part (for telegram/userId/fileId format)
     const parts = storageKey.split('/');
     return parts.length >= 3 ? parts[parts.length - 1] : null;
   }

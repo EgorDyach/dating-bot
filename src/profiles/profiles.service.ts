@@ -81,18 +81,18 @@ export class ProfilesService {
       // Validate ISO date format YYYY-MM-DD
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(value.trim())) {
-        throw new Error('Invalid date format. Use YYYY-MM-DD');
+        throw new Error('Неверный формат даты. Используй ДД.ММ.ГГГГ');
       }
       const date = new Date(value.trim());
       if (isNaN(date.getTime())) {
-        throw new Error('Invalid date');
+        throw new Error('Неверная дата');
       }
       // Store as YYYY-MM-DD string (PostgreSQL date type)
       profile.birthDate = value.trim();
     } else if (field === 'genderCode') {
       const gender = value.trim().toLowerCase();
       if (!['male', 'female'].includes(gender)) {
-        throw new Error("Gender must be 'male' or 'female'");
+        throw new Error("Пол должен быть 'male' или 'female'");
       }
       profile.genderCode = gender as 'male' | 'female';
     }

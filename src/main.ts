@@ -12,7 +12,7 @@ async function bootstrap() {
     }),
   );
   await app.listen(3000);
-  Logger.log('dating bot backend started on :3000');
+  Logger.log('Бэкенд бота запущен на :3000');
 }
 
 bootstrap();
