@@ -7,6 +7,7 @@ import { ProfilePhotoEntity } from '../database/entities/profile-photo.entity';
 import { ProfileRatingEntity } from '../database/entities/profile-rating.entity';
 import { UserPreferenceEntity } from '../database/entities/user-preference.entity';
 import { RedisService } from '../integrations/redis.service';
+import { MetricsService } from '../integrations/metrics.service';
 
 type FeedCard = {
   userId: string;
@@ -25,6 +26,7 @@ export class FeedService {
     @InjectRepository(UserPreferenceEntity)
     private readonly prefRepository: Repository<UserPreferenceEntity>,
     private readonly redisService: RedisService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async getNextProfile(viewerId: string): Promise<FeedCard | null> {
@@ -77,6 +79,7 @@ export class FeedService {
   }
 
   private async buildBatch(viewerId: string, limit: number): Promise<string[]> {
+    const startTime = Date.now();
     const pref = await this.prefRepository.findOne({ where: { userId: viewerId } });
 
     const qb = this.profileRepository
@@ -106,6 +109,8 @@ export class FeedService {
     }
 
     const rows = await qb.getRawMany<{ userId: string }>();
+    const duration = Date.now() - startTime;
+    this.metricsService.recordFeedBatchDuration(duration);
     return rows.map((row) => row.userId);
   }
 }

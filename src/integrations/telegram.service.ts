@@ -1,8 +1,16 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { Markup, Telegraf } from 'telegraf';
 import { readEnv } from '../config/env';
 import { FeedService } from '../feed/feed.service';
-import { InteractionAction, InteractionsService } from '../interactions/interactions.service';
+import {
+  InteractionAction,
+  InteractionsService,
+} from '../interactions/interactions.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import { UsersService } from '../users/users.service';
 
@@ -12,7 +20,10 @@ type ProfileEditField = 'displayName' | 'bio' | 'city';
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramService.name);
   private readonly bot = new Telegraf(readEnv().botToken);
-  private readonly pendingProfileEditField = new Map<string, ProfileEditField>();
+  private readonly pendingProfileEditField = new Map<
+    string,
+    ProfileEditField
+  >();
   private readonly waitingPhotoUpload = new Set<string>();
 
   constructor(
@@ -28,13 +39,14 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     this.bot.start(async (ctx) => {
       const actor = ctx.from;
       if (!actor) return;
-      const { isNew, user } = await this.usersService.registerOrUpdateTelegramUser({
-        telegramId: actor.id,
-        username: actor.username,
-        firstName: actor.first_name,
-        lastName: actor.last_name,
-        languageCode: actor.language_code,
-      });
+      const { isNew, user } =
+        await this.usersService.registerOrUpdateTelegramUser({
+          telegramId: actor.id,
+          username: actor.username,
+          firstName: actor.first_name,
+          lastName: actor.last_name,
+          languageCode: actor.language_code,
+        });
       const name = actor.first_name || actor.username || 'друг';
       if (isNew) {
         await ctx.reply(
@@ -61,7 +73,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       await this.sendOwnProfileCard(
         {
           userId: user.id,
-          displayNameFallback: actor.first_name || actor.username || 'Пользователь',
+          displayNameFallback:
+            actor.first_name || actor.username || 'Пользователь',
         },
         ctx.reply.bind(ctx),
       );
@@ -83,7 +96,11 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         languageCode: actor.language_code,
       });
       await ctx.answerCbQuery();
-      await this.sendNextRealProfile(user.id, ctx.chat?.id, ctx.reply.bind(ctx));
+      await this.sendNextRealProfile(
+        user.id,
+        ctx.chat?.id,
+        ctx.reply.bind(ctx),
+      );
     });
 
     this.bot.action(/^feed:(like|skip):(.+)$/, async (ctx) => {
@@ -97,7 +114,11 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 
       await this.interactionsService.react(user.id, viewedId, action);
       await ctx.answerCbQuery(action === 'like' ? 'Лайк' : 'Дизлайк');
-      await this.sendNextRealProfile(user.id, ctx.chat?.id, ctx.reply.bind(ctx));
+      await this.sendNextRealProfile(
+        user.id,
+        ctx.chat?.id,
+        ctx.reply.bind(ctx),
+      );
     });
 
     this.bot.action('menu:home', async (ctx) => {
@@ -108,11 +129,16 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     this.bot.action('profile:attach_photo', async (ctx) => {
       const actor = ctx.from;
       if (!actor) return;
-      const { user } = await this.usersService.registerOrUpdateTelegramUser({ telegramId: actor.id });
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+      });
       this.waitingPhotoUpload.add(user.id);
       this.pendingProfileEditField.delete(user.id);
       await ctx.answerCbQuery();
-      await ctx.reply('Пришли фото одним сообщением. Я прикреплю его к анкете.', this.mainInlineMenu());
+      await ctx.reply(
+        'Пришли фото одним сообщением. Я прикреплю его к анкете.',
+        this.mainInlineMenu(),
+      );
     });
 
     this.bot.action('profile:edit', async (ctx) => {
@@ -135,7 +161,9 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     this.bot.action(/^profile:edit:(displayName|bio|city)$/, async (ctx) => {
       const actor = ctx.from;
       if (!actor) return;
-      const { user } = await this.usersService.registerOrUpdateTelegramUser({ telegramId: actor.id });
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+      });
       const field = ctx.match[1] as ProfileEditField;
       this.pendingProfileEditField.set(user.id, field);
       this.waitingPhotoUpload.delete(user.id);
@@ -163,7 +191,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       await this.sendOwnProfileCard(
         {
           userId: user.id,
-          displayNameFallback: actor.first_name || actor.username || 'Пользователь',
+          displayNameFallback:
+            actor.first_name || actor.username || 'Пользователь',
         },
         ctx.reply.bind(ctx),
       );
@@ -172,25 +201,41 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     this.bot.on('photo', async (ctx) => {
       const actor = ctx.from;
       if (!actor) return;
-      const { user } = await this.usersService.registerOrUpdateTelegramUser({ telegramId: actor.id });
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+      });
       if (!this.waitingPhotoUpload.has(user.id)) {
-        await ctx.reply('Открой профиль и нажми "Прикрепить фото".', this.mainInlineMenu());
+        await ctx.reply(
+          'Открой профиль и нажми "Прикрепить фото".',
+          this.mainInlineMenu(),
+        );
         return;
       }
 
-      const photos = (ctx.message as { photo?: Array<{ file_id: string }> }).photo ?? [];
+      const photos =
+        (ctx.message as { photo?: Array<{ file_id: string }> }).photo ?? [];
       const largest = photos[photos.length - 1];
       if (!largest?.file_id) {
-        await ctx.reply('Не удалось прочитать фото, попробуй еще раз.', this.mainInlineMenu());
+        await ctx.reply(
+          'Не удалось прочитать фото, попробуй еще раз.',
+          this.mainInlineMenu(),
+        );
         return;
       }
-      const photoCount = await this.profilesService.addPhotoByTelegramFileId(user.id, largest.file_id);
+      const photoCount = await this.profilesService.addPhotoByTelegramFileId(
+        user.id,
+        largest.file_id,
+      );
       this.waitingPhotoUpload.delete(user.id);
-      await ctx.reply(`Фото добавлено к анкете. Всего фото: ${photoCount}.`, this.mainInlineMenu());
+      await ctx.reply(
+        `Фото добавлено к анкете. Всего фото: ${photoCount}.`,
+        this.mainInlineMenu(),
+      );
       await this.sendOwnProfileCard(
         {
           userId: user.id,
-          displayNameFallback: actor.first_name || actor.username || 'Пользователь',
+          displayNameFallback:
+            actor.first_name || actor.username || 'Пользователь',
         },
         ctx.reply.bind(ctx),
       );
@@ -201,14 +246,22 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       if (!actor) return;
       const text = ctx.message.text?.trim();
       if (!text || text.startsWith('/')) {
-        await ctx.reply('Используй кнопки в сообщениях бота.', this.mainInlineMenu());
+        await ctx.reply(
+          'Используй кнопки в сообщениях бота.',
+          this.mainInlineMenu(),
+        );
         return;
       }
 
-      const { user } = await this.usersService.registerOrUpdateTelegramUser({ telegramId: actor.id });
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+      });
       const pendingField = this.pendingProfileEditField.get(user.id);
       if (!pendingField) {
-        await ctx.reply('Навигация только кнопками. Открой меню ниже.', this.mainInlineMenu());
+        await ctx.reply(
+          'Навигация только кнопками. Открой меню ниже.',
+          this.mainInlineMenu(),
+        );
         return;
       }
 
@@ -218,7 +271,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       await this.sendOwnProfileCard(
         {
           userId: user.id,
-          displayNameFallback: actor.first_name || actor.username || 'Пользователь',
+          displayNameFallback:
+            actor.first_name || actor.username || 'Пользователь',
         },
         ctx.reply.bind(ctx),
       );
@@ -247,7 +301,9 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     ]);
   }
 
-  private async sendHelp(reply: (message: string, extra?: unknown) => Promise<unknown>) {
+  private async sendHelp(
+    reply: (message: string, extra?: unknown) => Promise<unknown>,
+  ) {
     await reply(
       [
         'Помощь:',
@@ -255,7 +311,9 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         '• 👤 Мой профиль - карточка профиля, фото и редактирование',
         '• 🧩 Анкеты - показать следующую анкету',
       ].join('\n'),
-      Markup.inlineKeyboard([[Markup.button.callback('⬅️ В меню', 'menu:home')]]),
+      Markup.inlineKeyboard([
+        [Markup.button.callback('⬅️ В меню', 'menu:home')],
+      ]),
     );
   }
 
@@ -268,7 +326,9 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     if (!candidate) {
       await reply(
         'Пока нет подходящих анкет в базе. Добавь реальные анкеты и попробуй снова.',
-        Markup.inlineKeyboard([[Markup.button.callback('⬅️ В меню', 'menu:home')]]),
+        Markup.inlineKeyboard([
+          [Markup.button.callback('⬅️ В меню', 'menu:home')],
+        ]),
       );
       return;
     }
@@ -304,7 +364,10 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     input: { userId: string; displayNameFallback: string },
     reply: (message: string, extra?: unknown) => Promise<unknown>,
   ): Promise<void> {
-    const profile = await this.profilesService.getOrCreateByUserId(input.userId, input.displayNameFallback);
+    const profile = await this.profilesService.getOrCreateByUserId(
+      input.userId,
+      input.displayNameFallback,
+    );
     const photoCount = await this.profilesService.countPhotos(input.userId);
     await reply(
       [
