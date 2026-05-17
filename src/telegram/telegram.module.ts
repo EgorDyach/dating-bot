@@ -8,6 +8,7 @@ import { UsersModule } from '../users/users.module';
 import { BlocksModule } from '../blocks/blocks.module';
 import { ReportsModule } from '../reports/reports.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
+import { MatchesModule } from '../matches/matches.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { AnalyticsModule } from '../analytics/analytics.module';
     BlocksModule,
     ReportsModule,
     AnalyticsModule,
+    MatchesModule,
   ],
   providers: [TelegramService],
 })

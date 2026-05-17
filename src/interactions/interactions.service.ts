@@ -28,7 +28,7 @@ export class InteractionsService {
     private readonly matchesService: MatchesService,
   ) {}
 
-  async react(viewerId: string, viewedId: string, action: InteractionAction): Promise<void> {
+  async react(viewerId: string, viewedId: string, action: InteractionAction): Promise<{ matched: boolean; matchedUserId?: string }> {
     await this.interactionsRepository.upsert(
       {
         viewerId,
@@ -38,10 +38,15 @@ export class InteractionsService {
       ['viewerId', 'viewedId'],
     );
 
+    let matched = false;
+    let matchedUserId: string | undefined;
+
     if (action === 'like') {
       this.metricsService.recordLike();
       const isMutual = await this.matchesService.createMatchIfMutualLike(viewerId, viewedId);
       if (isMutual) {
+        matched = true;
+        matchedUserId = viewedId;
         const userA = Math.min(Number(viewerId), Number(viewedId));
         const userB = Math.max(Number(viewerId), Number(viewedId));
         await this.matchRepository.save(
@@ -67,5 +72,7 @@ export class InteractionsService {
       action,
       happenedAt: new Date().toISOString(),
     });
+
+    return { matched, matchedUserId };
   }
 }

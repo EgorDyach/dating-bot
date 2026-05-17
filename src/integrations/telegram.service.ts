@@ -17,6 +17,7 @@ import { UserPreferencesService } from '../users/user-preferences.service';
 import { BlocksService } from '../blocks/blocks.service';
 import { ReportsService } from '../reports/reports.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { MatchesService } from '../matches/matches.service';
 
 type ProfileEditField = 'displayName' | 'bio' | 'city' | 'birthDate' | 'genderCode';
 type PrefEditField = 'genderPreference' | 'cityPreference' | 'ageMin' | 'ageMax';
@@ -42,6 +43,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     private readonly blocksService: BlocksService,
     private readonly reportsService: ReportsService,
     private readonly analyticsService: AnalyticsService,
+    private readonly matchesService: MatchesService,
   ) {
     const env = readEnv();
     const botOptions = this.createBotOptions(env);
@@ -151,6 +153,16 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       );
     });
 
+    this.bot.action('menu:matches', async (ctx) => {
+      const actor = ctx.from;
+      if (!actor) return;
+      const { user } = await this.usersService.registerOrUpdateTelegramUser({
+        telegramId: actor.id,
+      });
+      await ctx.answerCbQuery();
+      await this.sendMatchesList(user.id, ctx.reply.bind(ctx));
+    });
+
     this.bot.action('menu:feed', async (ctx) => {
       const actor = ctx.from;
       if (!actor) return;
@@ -178,8 +190,13 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       const action = ctx.match[1] as InteractionAction;
       const viewedId = String(ctx.match[2]);
 
-      await this.interactionsService.react(user.id, viewedId, action);
+      const { matched } = await this.interactionsService.react(user.id, viewedId, action);
       await ctx.answerCbQuery(action === 'like' ? 'Лайк' : 'Дизлайк');
+
+      if (matched) {
+        await ctx.reply('🎉 Это совпадение!', Markup.inlineKeyboard([[Markup.button.callback('❤️ Мои матчи', 'menu:matches')]]));
+      }
+
       await this.sendNextRealProfile(
         user.id,
         ctx.chat?.id,
@@ -583,6 +600,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     return Markup.inlineKeyboard([
       [Markup.button.callback('👤 Мой профиль', 'menu:profile')],
       [Markup.button.callback('🧩 Анкеты', 'menu:feed')],
+      [Markup.button.callback('❤️ Матчи', 'menu:matches')],
       [Markup.button.callback('🔍 Фильтры', 'menu:preferences')],
       [Markup.button.callback('📊 Статистика', 'menu:stats')],
       [Markup.button.callback('❓ Помощь', 'menu:help')],
@@ -696,6 +714,41 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         [Markup.button.callback('✏️ Изменить', 'profile:edit')],
         [Markup.button.callback('⬅️ В меню', 'menu:home')],
       ]),
+    );
+  }
+
+
+  private async sendMatchesList(
+    userId: string,
+    reply: (message: string, extra?: unknown) => Promise<unknown>,
+  ): Promise<void> {
+    const matchedIds = await this.matchesService.getMutualLikesForUser(userId);
+
+    if (matchedIds.length === 0) {
+      await reply('У тебя пока нет совпадений.', Markup.inlineKeyboard([[Markup.button.callback('⬅️ В меню', 'menu:home')]]));
+      return;
+    }
+
+    const matchData = await Promise.all(
+      matchedIds.map(async (id) => {
+        const profile = await this.profilesService.getByUserId(id);
+        const user = await this.usersService.findById(id);
+        return { profile, user };
+      }),
+    );
+
+    const matchList = matchData
+      .filter((m) => m.profile !== null)
+      .map((m) => {
+        const name = m.profile!.displayName;
+        const username = m.user?.username ? `@${m.user.username}` : '';
+        return `❤️ ${name}${username ? ` (${username})` : ''}`;
+      })
+      .join('\n');
+
+    await reply(
+      ['Твои матчи:', matchList].join('\n'),
+      Markup.inlineKeyboard([[Markup.button.callback('⬅️ В меню', 'menu:home')]]),
     );
   }
 }

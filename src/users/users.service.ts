@@ -40,4 +40,8 @@ export class UsersService {
     const saved = await this.usersRepository.save(user);
     return { isNew: !existing, user: saved };
   }
+
+  async findById(id: string): Promise<UserEntity | null> {
+    return this.usersRepository.findOne({ where: { id } });
+  }
 }

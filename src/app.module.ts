@@ -23,6 +23,7 @@ import { UsersModule } from './users/users.module';
 import { BlocksModule } from './blocks/blocks.module';
 import { ReportsModule } from './reports/reports.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { EventsModule } from './events/events.module';
 
 const env = readEnv();
 
@@ -60,6 +61,7 @@ const env = readEnv();
     ReportsModule,
     AnalyticsModule,
     TelegramModule,
+    EventsModule,
   ],
 })
 export class AppModule {}
