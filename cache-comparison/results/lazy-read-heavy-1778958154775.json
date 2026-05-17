@@ -1,0 +1,23 @@
+{
+  "testConfig": {
+    "strategy": "lazy",
+    "mode": "read-heavy",
+    "duration": 15,
+    "concurrency": 5
+  },
+  "result": {
+    "strategy": "lazy",
+    "mode": "read-heavy",
+    "duration": 15,
+    "concurrency": 5,
+    "totalRequests": 59812,
+    "successfulRequests": 0,
+    "failedRequests": 59812,
+    "throughput": 0,
+    "avgLatency": null,
+    "p95Latency": 0,
+    "p99Latency": 0,
+    "timestamp": "2026-05-16T19:02:34.751Z"
+  },
+  "appMetrics": {}
+}

@@ -16,6 +16,7 @@ class SOCKS5Server:
             # SOCKS5 greeting
             data = await reader.readexactly(2)
             if data[0] != 0x05:
+                print(f"Invalid SOCKS version: {data[0]}")
                 writer.close()
                 return
 
@@ -26,6 +27,7 @@ class SOCKS5Server:
             # Read CONNECT request
             data = await reader.readexactly(4)
             if data[0] != 0x05 or data[1] != 0x01:
+                print(f"Invalid request: version={data[0]}, cmd={data[1]}")
                 writer.close()
                 return
 
@@ -42,8 +44,11 @@ class SOCKS5Server:
                 port_data = await reader.readexactly(2)
                 port = struct.unpack('!H', port_data)[0]
             else:
+                print(f"Unknown address type: {addr_type}")
                 writer.close()
                 return
+
+            print(f"Client request: {addr}:{port}, forwarding to {self.target_host}:{self.target_port}")
 
             # Connect to actual target (ignore client request address)
             try:
@@ -51,7 +56,9 @@ class SOCKS5Server:
                     asyncio.open_connection(self.target_host, self.target_port),
                     timeout=10.0
                 )
+                print(f"Connected to {self.target_host}:{self.target_port}")
             except Exception as e:
+                print(f"Failed to connect to {self.target_host}:{self.target_port}: {e}")
                 # Send error response
                 writer.write(b'\x05\x01\x00\x01\x00\x00\x00\x00\x00\x00')
                 await writer.drain()
@@ -69,7 +76,7 @@ class SOCKS5Server:
                 return_exceptions=True
             )
         except Exception as e:
-            pass
+            print(f"Handler error: {e}")
         finally:
             try:
                 writer.close()

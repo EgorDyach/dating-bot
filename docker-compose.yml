@@ -27,16 +27,20 @@ services:
       timeout: 10s
       retries: 20
 
-  mtproto-proxy:
-    build:
-      context: .
-      dockerfile: Dockerfile.mtproto
-    ports:
-      - '8888:8888'
-    environment:
-      PROXY_SERVER: ${PROXY_SERVER}
-      PROXY_PORT: ${PROXY_PORT}
-      PROXY_SECRET: ${PROXY_SECRET}
+  ssh-tunnel:
+    image: alpine:3.19
+    command: >
+      sh -c "apk add --no-cache openssh-client &&
+             mkdir -p /root/.ssh &&
+             cp /ssh/id.pem /root/.ssh/id.pem &&
+             chmod 600 /root/.ssh/id.pem &&
+             ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30
+                 -i /root/.ssh/id.pem
+                 -D 0.0.0.0:1080 -N
+                 devops@31.97.184.155"
+    volumes:
+      - ${SSH_KEY_PATH}:/ssh/id.pem:ro
+    restart: unless-stopped
 
   bot:
     build: .
@@ -47,8 +51,8 @@ services:
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://rabbitmq:5672
       RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE}
-      PROXY_SERVER: mtproto-proxy
-      PROXY_PORT: 8888
+      PROXY_SERVER: ssh-tunnel
+      PROXY_PORT: 1080
     depends_on:
       postgres:
         condition: service_started
@@ -56,7 +60,7 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
-      mtproto-proxy:
+      ssh-tunnel:
         condition: service_started
 
 volumes:
